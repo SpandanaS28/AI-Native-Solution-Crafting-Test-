@@ -1,0 +1,82 @@
+﻿version: 1
+
+global:
+  default_action: later
+  later_delay_seconds: 120
+  max_notifications_per_user_per_10_min: 12
+  promotional_quiet_mode_cap_per_10_min: 2
+
+channels:
+  push:
+    cooldown_seconds_by_event_type:
+      promotion: 900
+      update: 300
+      reminder: 120
+  email:
+    cooldown_seconds_by_event_type:
+      promotion: 3600
+      update: 900
+  sms:
+    cooldown_seconds_by_event_type:
+      alert: 60
+
+rules:
+  - name: drop_expired
+    when:
+      expires_at_passed: true
+    action: never
+    reason: Expired notification
+
+  - name: suppress_exact_duplicate
+    when:
+      is_exact_duplicate: true
+      allow_duplicate_bypass: false
+    action: never
+    reason: Exact duplicate
+
+  - name: suppress_near_duplicate
+    when:
+      is_near_duplicate: true
+      allow_duplicate_bypass: false
+    action: never
+    reason: Near duplicate
+
+  - name: urgent_alerts_override_noisy
+    when:
+      event_type_in: [alert, system_event]
+      priority_hint_in: [urgent]
+    action: now
+    reason: Urgent alert override
+
+  - name: high_alerts_when_not_noisy
+    when:
+      event_type_in: [alert, system_event]
+      priority_hint_in: [high]
+      user_is_noisy: false
+    action: now
+    reason: High priority alert
+
+  - name: high_alerts_when_noisy_defer
+    when:
+      event_type_in: [alert, system_event]
+      priority_hint_in: [high]
+      user_is_noisy: true
+    action: later
+    delay_seconds: 180
+    reason: High alert but user is noisy, short defer
+
+  - name: suppress_promotions_when_noisy
+    when:
+      event_type_in: [promotion]
+      user_is_noisy: true
+    action: later
+    delay_seconds: 1800
+    reason: Noisy period, defer promotions
+
+  - name: cap_promotions_quiet_mode
+    when:
+      event_type_in: [promotion]
+      promotion_cap_exceeded: true
+    action: later
+    delay_seconds: 3600
+    reason: Promotion cap exceeded
